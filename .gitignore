@@ -1,0 +1,9 @@
+venv/
+.env
+__pycache__/
+*.pyc
+data/*.csv
+.vscode/
+data/*.parquet
+data/raw/
+test.py
