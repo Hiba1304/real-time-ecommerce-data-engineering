@@ -1,19 +1,28 @@
+import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, sum as _sum, countDistinct, round as _round, to_date
 
-spark=(
+# --- Azure (la clé vient du .env via les variables d'environnement) ---
+ACCOUNT = os.environ["AZURE_STORAGE_ACCOUNT"]
+KEY = os.environ["AZURE_STORAGE_KEY"]
+SILVER_PATH = f"abfss://silver@{ACCOUNT}.dfs.core.windows.net/silver_stream"
+GOLD_BASE = f"abfss://gold@{ACCOUNT}.dfs.core.windows.net"
+
+spark = (
     SparkSession.builder
     .appName("build_gold")
     .master("local[*]")
     .config("spark.sql.shuffle.partitions", "3")
+    .config(f"spark.hadoop.fs.azure.account.key.{ACCOUNT}.dfs.core.windows.net", KEY)
     .getOrCreate()
 )
 spark.sparkContext.setLogLevel("WARN")
-#1 lire silver(batch)
-silver=spark.read.parquet("/data/silver_stream")
-print("lignes dans silver:",silver.count())
 
-#2 CA PAR PAYS
+# 1. Lire Silver (batch) depuis Azure
+silver = spark.read.parquet(SILVER_PATH)
+print("lignes dans silver:", silver.count())
+
+# 2. CA par pays
 revenue_by_country = (
     silver.groupBy("Country")
     .agg(
@@ -22,7 +31,8 @@ revenue_by_country = (
     )
     .orderBy(col("revenue").desc())
 )
-# 3 CA par jour
+
+# 3. CA par jour
 revenue_by_day = (
     silver.withColumn("day", to_date("ts"))
     .groupBy("day")
@@ -46,14 +56,14 @@ top_products = (
     .limit(50)
 )
 
-# 5. Écrire Gold
-revenue_by_country.write.mode("overwrite").parquet("/data/gold/revenue_by_country")
-revenue_by_day.write.mode("overwrite").parquet("/data/gold/revenue_by_day")
-top_products.write.mode("overwrite").parquet("/data/gold/top_products")
+# 5. Écrire Gold dans Azure
+revenue_by_country.write.mode("overwrite").parquet(f"{GOLD_BASE}/revenue_by_country")
+revenue_by_day.write.mode("overwrite").parquet(f"{GOLD_BASE}/revenue_by_day")
+top_products.write.mode("overwrite").parquet(f"{GOLD_BASE}/top_products")
 
 # 6. Aperçu
 revenue_by_country.show(5, truncate=False)
 top_products.show(5, truncate=False)
-print("Gold terminé")
+print("Gold terminé ->", GOLD_BASE)
 
 spark.stop()

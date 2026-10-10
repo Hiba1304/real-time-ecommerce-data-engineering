@@ -25,18 +25,23 @@ services:
       - kafka
     user: root
     working_dir: /app
+    env_file:
+      - .env
     volumes:
       - ./spark:/app
       - ./data:/data
     command: sleep infinity
+
   airflow:
     image: apache/airflow:2.10.5
     container_name: airflow
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      _PIP_ADDITIONAL_REQUIREMENTS: "pandas pyarrow"
+      _PIP_ADDITIONAL_REQUIREMENTS: "pandas pyarrow adlfs"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs

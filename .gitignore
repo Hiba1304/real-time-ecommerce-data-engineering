@@ -15,3 +15,6 @@ data/raw/
 data/gold_airflow/
 airflow/logs/
 .env
+silver_log.txt
+gold_log.txt
+data/checkpoints/

@@ -1,25 +1,39 @@
+import os
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import pandas as pd
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-SILVER = Path("/data/silver_stream")
-GOLD = Path("/data/gold_airflow")
+# Chemins Azure Data Lake (conteneur/dossier). La clé vient du .env.
+SILVER = "silver/silver_stream"
+GOLD_DIR = "gold/gold_airflow"          # séparé du Gold Spark pour pouvoir comparer
+GOLD_FILE = f"abfs://{GOLD_DIR}/revenue_by_country.parquet"
+
+
+def _storage_options():
+    """Identifiants Azure lus dans les variables d'environnement (jamais dans le code)."""
+    return {
+        "account_name": os.environ["AZURE_STORAGE_ACCOUNT"],
+        "account_key": os.environ["AZURE_STORAGE_KEY"],
+    }
 
 
 def check_silver():
-    """Vérifie que Silver existe et n'est pas vide."""
-    files = list(SILVER.glob("*.parquet"))
+    """Vérifie que Silver existe sur Azure et n'est pas vide."""
+    from adlfs import AzureBlobFileSystem
+
+    fs = AzureBlobFileSystem(**_storage_options())
+    files = fs.glob(f"{SILVER}/*.parquet")
     if not files:
-        raise FileNotFoundError("Silver est vide ou introuvable")
-    print(f"{len(files)} fichiers Silver trouvés")
+        raise FileNotFoundError("Silver est vide ou introuvable sur Azure")
+    print(f"{len(files)} fichiers Silver trouvés sur Azure")
 
 
 def build_gold():
-    """Calcule le CA par pays à partir de Silver."""
-    df = pd.read_parquet(SILVER)
+    """Calcule le CA par pays à partir de Silver (Azure) et écrit Gold sur Azure."""
+    opts = _storage_options()
+    df = pd.read_parquet(f"abfs://{SILVER}", storage_options=opts)
     by_country = (
         df.groupby("Country")
         .agg(total_revenue=("Revenue", "sum"), orders=("InvoiceNo", "nunique"))
@@ -27,14 +41,13 @@ def build_gold():
         .reset_index()
         .sort_values("total_revenue", ascending=False)
     )
-    GOLD.mkdir(parents=True, exist_ok=True)
-    by_country.to_parquet(GOLD / "revenue_by_country.parquet", index=False)
+    by_country.to_parquet(GOLD_FILE, index=False, storage_options=opts)
     print(by_country.head())
 
 
 def quality_checks():
-    """Contrôles qualité sur la table Gold."""
-    g = pd.read_parquet(GOLD / "revenue_by_country.parquet")
+    """Contrôles qualité sur la table Gold (lue depuis Azure)."""
+    g = pd.read_parquet(GOLD_FILE, storage_options=_storage_options())
     assert g["Country"].notna().all(), "Pays manquants"
     assert g["Country"].is_unique, "Pays en double"
     assert (g["total_revenue"] > 0).all(), "CA négatif ou nul"

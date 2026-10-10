@@ -1,3 +1,4 @@
+import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     from_json, col, regexp_replace, round as _round,
@@ -5,11 +6,18 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType
 
+# --- Azure (la clé vient du .env via les variables d'environnement) ---
+ACCOUNT = os.environ["AZURE_STORAGE_ACCOUNT"]
+KEY = os.environ["AZURE_STORAGE_KEY"]
+SILVER_PATH = f"abfss://silver@{ACCOUNT}.dfs.core.windows.net/silver_stream"
+CHECKPOINT = "/data/checkpoints/silver_stream"  # volume local persistant
+
 spark = (
     SparkSession.builder
     .appName("write_silver_stream")
     .master("local[*]")
     .config("spark.sql.shuffle.partitions", "3")
+    .config(f"spark.hadoop.fs.azure.account.key.{ACCOUNT}.dfs.core.windows.net", KEY)
     .getOrCreate()
 )
 spark.sparkContext.setLogLevel("WARN")
@@ -56,11 +64,11 @@ clean = (
 query = (
     clean.writeStream
     .format("parquet")
-    .option("path", "/data/silver_stream")
-    .option("checkpointLocation", "/tmp/checkpoint_silver_stream")
+    .option("path", SILVER_PATH)
+    .option("checkpointLocation", CHECKPOINT)
     .outputMode("append")
     .trigger(availableNow=True)
     .start()
 )
 query.awaitTermination()
-print("Écriture terminée")
+print("Écriture Silver terminée ->", SILVER_PATH)
