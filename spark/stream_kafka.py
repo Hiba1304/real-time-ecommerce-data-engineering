@@ -34,7 +34,9 @@ df =( spark \
 )
 # 4. octets → colonnes 
 sales = (
-    df.select(from_json(col("value").cast("string"), schema).alias("data"))
+    df.select(
+        from_json(col("value").cast("string"),
+                  schema).alias("data"))
     .select("data.*")
 )
 # 5. Afficher dans la console

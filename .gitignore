@@ -7,3 +7,8 @@ data/*.csv
 data/*.parquet
 data/raw/
 test.py
+data/silver_stream/
+data/*.parquet
+data/gold/
+data/silver_stream/
+data/raw/
