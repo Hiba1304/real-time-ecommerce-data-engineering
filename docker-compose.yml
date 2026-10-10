@@ -29,3 +29,17 @@ services:
       - ./spark:/app
       - ./data:/data
     command: sleep infinity
+  airflow:
+    image: apache/airflow:2.10.5
+    container_name: airflow
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      _PIP_ADDITIONAL_REQUIREMENTS: "pandas pyarrow"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./data:/data
+    command: standalone

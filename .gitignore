@@ -12,3 +12,5 @@ data/*.parquet
 data/gold/
 data/silver_stream/
 data/raw/
+data/gold_airflow/
+airflow/logs/
