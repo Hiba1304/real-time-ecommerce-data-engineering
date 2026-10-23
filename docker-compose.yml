@@ -48,3 +48,16 @@ services:
       - ./airflow/plugins:/opt/airflow/plugins
       - ./data:/data
     command: standalone
+  postgres:
+    image: postgres:16
+    container_name: ecommerce_db
+    environment:
+      POSTGRES_USER: ecommerce
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ecommerce
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
